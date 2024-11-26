@@ -43,7 +43,17 @@ jobs:
         asset_name: bundle.js
         asset_content_type: application/javascript
 
+    - name: Check CSS file size
+      id: check_css_size
+      run: |
+        if [ -s dist/combined/styles.css ]; then
+          echo "UPLOAD_CSS=true" >> $GITHUB_ENV
+        else
+          echo "UPLOAD_CSS=false" >> $GITHUB_ENV
+        fi
+
     - name: Upload CSS asset
+      if: env.UPLOAD_CSS == 'true'
       uses: actions/upload-release-asset@v1
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
