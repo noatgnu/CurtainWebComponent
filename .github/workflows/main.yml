@@ -1,0 +1,65 @@
+name: Build and Release
+
+on:
+  release:
+    types: [created]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '16'
+
+    - name: Install dependencies
+      run: npm install
+
+    - name: Build project
+      run: npm run build
+
+    - name: Combine JS and CSS
+      run: |
+        mkdir -p dist/combined
+        cat dist/**/*.js > dist/combined/bundle.js
+        cat dist/**/*.css > dist/combined/styles.css
+
+    - name: Get version from package.json
+      id: get_version
+      run: echo "VERSION=$(jq -r .version < package.json)" >> $GITHUB_ENV
+
+    - name: Create release
+      id: create_release
+      uses: actions/create-release@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        tag_name: v${{ env.VERSION }}
+        release_name: Release v${{ env.VERSION }}
+        draft: false
+        prerelease: false
+
+    - name: Upload JS asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/combined/bundle.js
+        asset_name: bundle.js
+        asset_content_type: application/javascript
+
+    - name: Upload CSS asset
+      uses: actions/upload-release-asset@v1
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      with:
+        upload_url: ${{ steps.create_release.outputs.upload_url }}
+        asset_path: dist/combined/styles.css
+        asset_name: styles.css
+        asset_content_type: text/css
