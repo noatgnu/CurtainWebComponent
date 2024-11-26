@@ -1,0 +1,12 @@
+<plotly-plot
+  [divId]="'volcanoPlot'"
+  [data]="graphData"
+  [layout]="graphLayout"
+  [config]="config"
+  [updateOnLayoutChange]="true"
+  [revision]="revision"
+  (plotlyClick)="selectData($event)"
+  (selected)="selectData($event)"
+  (legendClick)="legendClickHandler($event)"
+  (relayout)="handleLayoutChange($event)"
+></plotly-plot>
