@@ -26,8 +26,8 @@ jobs:
     - name: Combine JS and CSS
       run: |
         mkdir -p dist/combined
-        cat dist/**/*.js > dist/combined/bundle.js
-        cat dist/**/*.css > dist/combined/styles.css
+        cat dist/curtain-web-component/browser/*.js > dist/combined/bundle.js
+        cat dist/curtain-web-component/browser/*.css > dist/combined/styles.css
 
     - name: Get version from package.json
       id: get_version
