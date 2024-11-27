@@ -32,7 +32,7 @@ export class VolcanoPlotComponent {
   ]
   revision = 0
   graphLayout: any = {
-    editable: true,
+    hovermode: "closest",
     height: 700, width: 700,
     margin: {r: null, l: null, b: null, t: null},
     xaxis: {

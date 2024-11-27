@@ -1,0 +1,28 @@
+<div>
+  <form [formGroup]="form" style="display: flex; gap:20px">
+    <mat-form-field>
+      <mat-select formControlName="filterType">
+        @for (t of filterTypeOptions; track t) {
+          <mat-option [value]="t">
+            {{t}}
+          </mat-option>
+        }
+      </mat-select>
+      <mat-label>Filter Type</mat-label>
+    </mat-form-field>
+    <mat-form-field>
+      <input matInput type="search" formControlName="search" [matAutocomplete]="auto">
+      <mat-label>Search term...</mat-label>
+      <mat-autocomplete #auto="matAutocomplete">
+        @for (option of filteredOptions | async; track option) {
+          <mat-option [value]="option">
+            {{option}}
+          </mat-option>
+        }
+      </mat-autocomplete>
+    </mat-form-field>
+    <button type="submit" mat-raised-button (click)="emitSearch()">Search</button>
+  </form>
+
+</div>
+

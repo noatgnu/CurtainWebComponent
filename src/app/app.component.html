@@ -1,15 +1,37 @@
-@if (downloading) {
-  <app-progress-bar [progress]="progress"></app-progress-bar>
-} @else {
-  @if (data.currentDF.count()) {
-    @if (finished) {
-      <app-volcano-plot [data]="data.currentDF"></app-volcano-plot>
-    }
+
+<div style="display: flex; flex-direction: column; gap:20px; padding: 20px">
+  @if (switchid) {
+    <div style="display:flex; gap:20px">
+      <mat-form-field>
+        <input type="text" matInput [(ngModel)]="switchID">
+        <mat-label>Switch ID</mat-label>
+      </mat-form-field>
+      <button mat-raised-button (click)="curtainid=switchID">Switch ID</button>
+    </div>
+  }
+  @if (downloading) {
+
+    <div>
+      Downloading data...
+      <app-progress-bar [progress]="progress"></app-progress-bar>
+    </div>
 
   } @else {
-    @if (finished) {
-      <p>No data found for this ID</p>
+    @if (data.currentDF.count()) {
+      @if (finished) {
+        <div style="display: flex">
+          @if (search) {
+            <app-typeahead (searchEvent)="handleSearch($event)" [allGenes]="data.allGenes" [primaryIDsList]="data.primaryIDsList"></app-typeahead>
+          }
+          <app-volcano-plot [data]="data.currentDF"></app-volcano-plot>
+        </div>
+      }
+    } @else {
+      @if (finished) {
+        <p>No data found for this ID</p>
+      }
     }
   }
-}
+</div>
+
 

@@ -12,10 +12,17 @@ import {InputFile} from './input-file';
 import {Settings} from './settings';
 import {Subscription} from 'rxjs';
 import {ProgressBarComponent} from './progress-bar/progress-bar.component';
+import {WebWorkerService} from './web-worker.service';
+import {TypeaheadComponent} from './typeahead/typeahead.component';
+import {MatFormField, MatLabel} from '@angular/material/form-field';
+import {MatButton} from '@angular/material/button';
+import {MatInput} from '@angular/material/input';
+import {FormsModule} from '@angular/forms';
+import {MatCard, MatCardContent} from '@angular/material/card';
 
 @Component({
   selector: 'app-root',
-  imports: [VolcanoPlotComponent, ProgressBarComponent],
+  imports: [MatLabel, VolcanoPlotComponent, ProgressBarComponent, TypeaheadComponent, MatFormField, MatButton, MatInput, FormsModule, MatCard, MatCardContent],
   templateUrl: './app.component.html',
   styleUrl: './app.component.scss'
 })
@@ -28,6 +35,10 @@ export class AppComponent implements OnInit, OnDestroy{
   progress: number = 0;
   downloading = false;
   finished = false;
+  @Input("search") search: boolean = false;
+  @Input("switchid") switchid: boolean = false;
+  switchID: string = "";
+
   @Input("curtainid") set curtainid(value: string) {
     this.finished = false;
     this.downloading = false;
@@ -53,9 +64,11 @@ export class AppComponent implements OnInit, OnDestroy{
     } else {
       this.downloading = true;
       this.web.getData(urlData).subscribe((data) => {
-        this.downloading = false;
+
         if (data) {
-          this.restoreSettings(data)
+          this.restoreSettings(data).then(() => {
+            this.downloading = false;
+          })
         }
       }, (error) => {
         this.downloading = false;
@@ -78,7 +91,7 @@ export class AppComponent implements OnInit, OnDestroy{
   }
 
 
-  constructor(private web: WebService, public data: DataService, private settings: SettingsService, private uniprot: UniprotService) {
+  constructor(private webWorker: WebWorkerService, private web: WebService, public data: DataService, private settings: SettingsService, private uniprot: UniprotService) {
 
   }
 
@@ -273,102 +286,112 @@ export class AppComponent implements OnInit, OnDestroy{
   }
 
   startWork() {
+    console.log("Starting work")
+    console.log(typeof Worker)
     if (typeof Worker !== 'undefined') {
-      // Create a new
-      this.worker = new Worker(new URL('./data.worker', import.meta.url));
+      // Create a new worker instance
+      const blob = new Blob([this.webWorker.workerCode], { type: 'application/javascript' });
+      const url = URL.createObjectURL(blob);
+      this.worker = new Worker(url);
+      console.log(this.worker)
       this.worker.onmessage = (data: MessageEvent<any>) => {
+        console.log(data)
         if (data.data) {
           if (data.data.type === "progress") {
-            //this.updateProgressBar(data.data.value, data.data.text)
-          } else {
-            if (data.data.type === "resultDifferential") {
-              this.data.differential.df = fromJSON(data.data.differential)
-              for (const i in this.data.differentialForm) {
-                if (this.data.differentialForm.hasOwnProperty(i)) {
-                  if (i in data.data.differentialForm) {
-                    // @ts-ignore
-                    this.data.differentialForm[i] = data.data.differentialForm[i]
-                  }
-                }
-              }
-              let currentDF = this.data.differential.df.where(r => this.data.differentialForm.comparisonSelect.includes(r[this.data.differentialForm.comparison])).bake()
 
-              const d: string[] = []
-              for (const r of currentDF) {
-                d.push(r[this.data.differentialForm.primaryIDs] + "("+r[this.data.differentialForm.comparison]+")")
-              }
-
-              currentDF = currentDF.withSeries("UniquePrimaryIDs", new Series(d)).bake()
-              const fc = currentDF.getSeries(this.data.differentialForm.foldChange).where(i => !isNaN(i)).bake()
-              const sign = currentDF.getSeries(this.data.differentialForm.significant).where(i => !isNaN(i)).bake()
-
-              this.data.minMax = {
-                fcMin: fc.min(),
-                fcMax: fc.max(),
-                pMin: sign.min(),
-                pMax: sign.max()
-              }
-              this.data.currentDF = currentDF
-              this.data.primaryIDsList = this.data.currentDF.getSeries(this.data.differentialForm.primaryIDs).bake().distinct().toArray()
-              for (const p of this.data.primaryIDsList) {
-                if (!this.data.primaryIDsMap[p])  {
-                  this.data.primaryIDsMap[p] = {}
-                  this.data.primaryIDsMap[p][p] = true
-                }
-                for (const n of p.split(";")) {
-                  if (!this.data.primaryIDsMap[n]) {
-                    this.data.primaryIDsMap[n] = {}
-                  }
-                  this.data.primaryIDsMap[n][p] = true
-                }
-              }
-
-              this.worker.postMessage({
-                task: 'processRawFile',
-                rawForm: this.data.rawForm,
-                raw: this.data.raw.originalFile,
-                settings: Object.assign({}, this.settings.settings)
-              })
-              this.data.raw.df = new DataFrame()
-            } else if (data.data.type === "resultRaw") {
-              console.log(data.data.settings.currentID)
-              console.log(data.data.raw)
-              this.data.raw.df = fromJSON(data.data.raw)
-              console.log(data.data.settings)
-              for (const s in this.settings.settings) {
-
-                if (this.settings.settings.hasOwnProperty(s)) {
-                  // @ts-ignore
-                  this.settings.settings[s] = data.data.settings[s]
-                }
-              }
-              this.data.conditions = data.data.conditions
-              console.log(this.settings.settings)
-              this.processUniProt()
-              this.worker.terminate()
-              this.finished = true
-            } else if (data.data.type === "resultDifferentialCompleted") {
-
-            }
+            // Handle progress updates
+          } else if (data.data.type === "resultDifferential") {
+            this.handleDifferentialResult(data.data);
+            this.worker.postMessage({
+              task: 'processRawFile',
+              rawForm: this.data.rawForm,
+              raw: this.data.raw.originalFile,
+              settings: Object.assign({}, this.settings.settings)
+            })
+          } else if (data.data.type === "resultRaw") {
+            this.handleRawResult(data.data);
           }
         } else {
-          this.worker.terminate()
-          this.finished = true
+          this.worker.terminate();
         }
-
       };
       this.worker.postMessage({
         task: 'processDifferentialFile',
         differential: this.data.differential.originalFile,
         differentialForm: this.data.differentialForm
       });
-      this.data.differential.df = new DataFrame()
-      this.finished = true
+      this.data.differential.df = new DataFrame();
     } else {
-      this.processFiles().then(() => {
-        this.finished = true
-      })
+      // Fallback to processing in the main thread
+      const differentialResult = this.webWorker.processDifferentialFile({
+        differential: this.data.differential.originalFile,
+        differentialForm: this.data.differentialForm
+      });
+      this.handleDifferentialResult(differentialResult);
+
+      const rawResult = this.webWorker.processRawFile({
+        rawForm: this.data.rawForm,
+        raw: this.data.raw.originalFile,
+        settings: Object.assign({}, this.settings.settings)
+      });
+      this.handleRawResult(rawResult);
+      this.worker.terminate();
     }
+  }
+
+  handleDifferentialResult(data: any) {
+    this.data.differential.df = fromJSON(data.differential);
+    for (const i in this.data.differentialForm) {
+      if (this.data.differentialForm.hasOwnProperty(i)) {
+        if (i in data.differentialForm) {
+          // @ts-ignore
+          this.data.differentialForm[i] = data.differentialForm[i];
+        }
+      }
+    }
+    let currentDF = this.data.differential.df.where(r => this.data.differentialForm.comparisonSelect.includes(r[this.data.differentialForm.comparison])).bake();
+
+    const d: string[] = [];
+    for (const r of currentDF) {
+      d.push(r[this.data.differentialForm.primaryIDs] + "(" + r[this.data.differentialForm.comparison] + ")");
+    }
+
+    currentDF = currentDF.withSeries("UniquePrimaryIDs", new Series(d)).bake();
+    const fc = currentDF.getSeries(this.data.differentialForm.foldChange).where(i => !isNaN(i)).bake();
+    const sign = currentDF.getSeries(this.data.differentialForm.significant).where(i => !isNaN(i)).bake();
+
+    this.data.minMax = {
+      fcMin: fc.min(),
+      fcMax: fc.max(),
+      pMin: sign.min(),
+      pMax: sign.max()
+    };
+    this.data.currentDF = currentDF;
+    this.data.primaryIDsList = this.data.currentDF.getSeries(this.data.differentialForm.primaryIDs).bake().distinct().toArray();
+    for (const p of this.data.primaryIDsList) {
+      if (!this.data.primaryIDsMap[p]) {
+        this.data.primaryIDsMap[p] = {};
+        this.data.primaryIDsMap[p][p] = true;
+      }
+      for (const n of p.split(";")) {
+        if (!this.data.primaryIDsMap[n]) {
+          this.data.primaryIDsMap[n] = {};
+        }
+        this.data.primaryIDsMap[n][p] = true;
+      }
+    }
+  }
+
+  handleRawResult(data: any) {
+    this.data.raw.df = fromJSON(data.raw);
+    for (const s in this.settings.settings) {
+      if (this.settings.settings.hasOwnProperty(s)) {
+        // @ts-ignore
+        this.settings.settings[s] = data.settings[s];
+      }
+    }
+    this.data.conditions = data.conditions;
+    this.processUniProt();
   }
 
   async processFiles(e: any = null) {
@@ -484,6 +507,7 @@ export class AppComponent implements OnInit, OnDestroy{
           this.data.primaryIDsMap[n][p] = true
         }
       }
+
       this.processUniProt()
     }
 
@@ -574,17 +598,20 @@ export class AppComponent implements OnInit, OnDestroy{
             //this.finished.emit(true)
             this.clicked = false
             this.uniprot.uniprotParseStatus.next(false)
+            this.finished = true
             //this.updateProgressBar(100, "Finished")
           });
         } else {
           //this.finished.emit(true)
           this.clicked = false
+          this.finished = true
           //this.updateProgressBar(100, "Finished")
         }
       } else {
         //this.finished.emit(true)
         this.clicked = false
         this.data.bypassUniProt = false
+        this.finished = true
         //this.updateProgressBar(100, "Finished")
       }
 
@@ -618,6 +645,7 @@ export class AppComponent implements OnInit, OnDestroy{
       //this.finished.emit(true)
       //this.clicked = false
       //this.updateProgressBar(100, "Finished")
+      this.finished=true
     }
   }
 
@@ -666,5 +694,15 @@ export class AppComponent implements OnInit, OnDestroy{
     this.downloadProgressSubscription = this.web.downloadProgress.subscribe(progress => {
       this.progress = progress;
     });
+  }
+
+  handleSearch(data: any) {
+    let pids: string[] = []
+    if (data["filterType"] === "Genes") {
+      pids = this.data.getPrimaryIDsFromGeneNames(data["search"])
+    } else {
+      pids = [data["search"]]
+    }
+    this.data.annotationService.next({id: pids, remove: false})
   }
 }

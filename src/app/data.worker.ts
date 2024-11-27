@@ -50,15 +50,6 @@ addEventListener('message', (data: MessageEvent<any>) => {
         return r
       })
 
-
-
-      // passing data back to main thread in chunks of 100 items each to avoid memory issues
-      /*const chunkSize = 100
-      const chunkNumber = Math.ceil(df.count() / chunkSize)
-      for (let i = 0; i < chunkNumber; i++) {
-        postMessage({type: "progress", value: i*100/chunkNumber, text: "Processing differential data..."})
-        postMessage({type: "resultDifferential", differential: df.skip(i*chunkSize).take(chunkSize).toArray()})
-      }*/
       postMessage({type: "progress", value: 100, text: "Finished processing differential data"})
       // @ts-ignore
       const result = {type: "resultDifferential", differential: JSON.stringify(store), differentialForm: data.data.differentialForm}

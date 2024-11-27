@@ -21,18 +21,12 @@ jobs:
       run: npm install
 
     - name: Build project
-      run: npm run build
-
-    - name: Combine JS and CSS
-      run: |
-        mkdir -p dist/combined
-        cat dist/curtain-web-component/browser/*.js > dist/combined/bundle.js
-        cat dist/curtain-web-component/browser/*.css > dist/combined/styles.css
+      run: npm run custom-build
 
     - name: Get version from package.json
       id: get_version
       run: echo "VERSION=$(jq -r .version < package.json)" >> $GITHUB_ENV
-      
+
     - name: Upload JS asset
       uses: actions/upload-release-asset@v1
       env:
@@ -59,6 +53,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: dist/combined/styles.css
+        asset_path: dist/styles.css
         asset_name: styles.css
         asset_content_type: text/css
