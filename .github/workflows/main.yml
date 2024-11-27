@@ -33,14 +33,14 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       with:
         upload_url: ${{ github.event.release.upload_url }}
-        asset_path: dist/combined/bundle.js
+        asset_path: dist/bundle.js
         asset_name: bundle.js
         asset_content_type: application/javascript
 
     - name: Check CSS file size
       id: check_css_size
       run: |
-        if [ -s dist/combined/styles.css ]; then
+        if [ -s dist/styles.css ]; then
           echo "UPLOAD_CSS=true" >> $GITHUB_ENV
         else
           echo "UPLOAD_CSS=false" >> $GITHUB_ENV

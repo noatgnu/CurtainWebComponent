@@ -19,7 +19,7 @@
   } @else {
     @if (data.currentDF.count()) {
       @if (finished) {
-        <div style="display: flex">
+        <div style="display: flex; flex-direction: column; gap: 20px">
           @if (search) {
             <app-typeahead (searchEvent)="handleSearch($event)" [allGenes]="data.allGenes" [primaryIDsList]="data.primaryIDsList"></app-typeahead>
           }
