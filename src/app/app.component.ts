@@ -157,12 +157,25 @@ export class AppComponent implements OnInit, OnDestroy{
   }
 
   handleSearch(data: any) {
+    console.log(data)
     let pids: string[] = []
-    if (data["filterType"] === "Genes") {
-      pids = this.data.getPrimaryIDsFromGeneNames(data["search"])
-    } else {
-      pids = [data["search"]]
+    if (this.mode === "proteomics") {
+      if (data["filterType"] === "Genes") {
+        pids = this.data.getPrimaryIDsFromGeneNames(data["search"])
+      } else {
+        pids = [data["search"]]
+      }
+      this.data.annotationService.next({id: pids, remove: false})
+    } else if (this.mode === "ptm") {
+      if (data["filterType"] === "Genes") {
+        pids = this.ptmData.getPrimaryFromGeneNames(data["search"])
+      } else if (data["filterType"] === "Accessions") {
+        pids = this.ptmData.getPrimaryFromAcc(data["search"])
+      } else {
+        pids = [data["search"]]
+      }
+      this.ptmData.annotationService.next({id: pids, remove: false})
     }
-    this.data.annotationService.next({id: pids, remove: false})
+
   }
 }

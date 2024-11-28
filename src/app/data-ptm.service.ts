@@ -6,6 +6,7 @@ import {SettingsService} from './settings.service';
 import {Differential} from './differential-ptm';
 import {InputFile} from './input-file';
 import {Raw} from './raw';
+import {UniprotPtmService} from './uniprot-ptm.service';
 
 @Injectable({
   providedIn: 'root'
@@ -181,7 +182,7 @@ export class DataPtmService {
   ]
   redrawTrigger: Subject<boolean> = new Subject()
   colorMap: any = {}
-  constructor(private settings: SettingsService, private uniprot: UniprotService) { }
+  constructor(private settings: SettingsService, private uniprot: UniprotPtmService) { }
 
   clear() {
     this.selected = []

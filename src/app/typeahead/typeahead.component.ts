@@ -28,8 +28,15 @@ import {MatButton} from '@angular/material/button';
 })
 export class TypeaheadComponent implements OnInit{
   @Input() allGenes: string[] = [];
+  @Input() accessionList: string[] = [];
   @Input() primaryIDsList: string[] = [];
   @Input() placeholder: string = 'Search...';
+  @Input() set mode(value: string) {
+    if (value === 'ptm') {
+      this.filterTypeOptions = ['Primary IDs', 'Genes', 'Accessions']
+    }
+  }
+
 
   filterType: string = 'Genes';
   filterTypeOptions: string[] = ['Primary IDs', 'Genes'];
@@ -68,6 +75,10 @@ export class TypeaheadComponent implements OnInit{
         );
       case 'Genes':
         return this.allGenes.filter(option =>
+          option.toLowerCase().includes(filterValue)
+        );
+      case 'Accessions':
+        return this.accessionList.filter(option =>
           option.toLowerCase().includes(filterValue)
         );
       default:

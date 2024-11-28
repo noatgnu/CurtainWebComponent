@@ -21,7 +21,12 @@
       @if (proteomicsWorker.finished || ptmWorker.finished) {
         <div style="display: flex; flex-direction: column; gap: 20px">
           @if (search) {
-            <app-typeahead (searchEvent)="handleSearch($event)" [allGenes]="data.allGenes" [primaryIDsList]="data.primaryIDsList"></app-typeahead>
+            @if (proteomicsWorker.finished) {
+              <app-typeahead (searchEvent)="handleSearch($event)" [allGenes]="data.allGenes" [primaryIDsList]="data.primaryIDsList"></app-typeahead>
+            } @else if (ptmWorker.finished) {
+              <app-typeahead (searchEvent)="handleSearch($event)" [allGenes]="ptmData.allGenes" [primaryIDsList]="ptmData.primaryIDsList" [accessionList]="ptmData.accessionList" [mode]="mode"></app-typeahead>
+            }
+
           }
           @if (proteomicsWorker.finished) {
             <app-volcano-plot [data]="data.currentDF"></app-volcano-plot>
