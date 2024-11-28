@@ -17,17 +17,21 @@
     </div>
 
   } @else {
-    @if (data.currentDF.count()) {
-      @if (finished) {
+    @if (data.currentDF.count() || ptmData.currentDF.count()) {
+      @if (proteomicsWorker.finished || ptmWorker.finished) {
         <div style="display: flex; flex-direction: column; gap: 20px">
           @if (search) {
             <app-typeahead (searchEvent)="handleSearch($event)" [allGenes]="data.allGenes" [primaryIDsList]="data.primaryIDsList"></app-typeahead>
           }
-          <app-volcano-plot [data]="data.currentDF"></app-volcano-plot>
+          @if (proteomicsWorker.finished) {
+            <app-volcano-plot [data]="data.currentDF"></app-volcano-plot>
+          } @else if (ptmWorker.finished) {
+            <app-ptm-volcano-plot [data]="ptmData.currentDF"></app-ptm-volcano-plot>
+          }
         </div>
       }
     } @else {
-      @if (finished) {
+      @if (proteomicsWorker.finished) {
         <p>No data found for this ID</p>
       }
     }

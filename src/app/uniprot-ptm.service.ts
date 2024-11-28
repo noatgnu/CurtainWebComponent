@@ -1,31 +1,28 @@
 import { Injectable } from '@angular/core';
+import {Accession, Parser} from 'uniprotparserjs';
 import {BehaviorSubject, Subject} from 'rxjs';
 import {HttpClient} from '@angular/common/http';
-import {WebService} from './web.service';
-import {Parser} from 'uniprotparserjs';
 
 @Injectable({
   providedIn: 'root'
 })
-export class UniprotService {
-
+export class UniprotPtmService {
   run = 0
   public Re = /([OPQ][0-9][A-Z0-9]{3}[0-9]|[A-NR-Z][0-9]([A-Z][A-Z0-9]{2}[0-9]){1,2})(-\d+)?/;
-
   results: Map<string, any> = new Map<string, any>()
   dataMap: Map<string, any> = new Map<string, any>()
   db: Map<string, any> = new Map<string, any>()
   organism = ""
   uniprotParseStatus = new BehaviorSubject<boolean>(false)
   uniprotProgressBar = new Subject<any>()
-  accMap: Map<string, string[]> = new Map<string, string[]>()
-  geneNameToAcc: any = {}
+  accMap: Map<string, string> = new Map<string, string>()
   geneNameToPrimary: any = {}
-  constructor(private http: HttpClient, private web: WebService) {
-  }
+  constructor(private http: HttpClient) { }
 
   async UniprotParserJS(accList: string[]) {
-    const parser = new Parser(5, "accession,id,gene_names,protein_name,organism_name,organism_id,length,xref_refseq,cc_subcellular_location,sequence,ft_var_seq,cc_alternative_products,cc_function,ft_domain,xref_string,cc_disease,cc_pharmaceutical,ft_mutagen")
+    const parser = new Parser(5, "accession,id,gene_names,protein_name,organism_name,organism_id,length,cc_subcellular_location,sequence,ft_var_seq,cc_alternative_products,ft_domain,xref_string,ft_mod_res,cc_function,cc_disease,cc_pharmaceutical,ft_mutagen,xref_mim")
+    //randomly shuffle the array
+    accList.sort(() => Math.random() - 0.5);
     const res = await parser.parse(accList, 5000)
     let currentRun = 1
     let totalRun = 0
@@ -36,7 +33,6 @@ export class UniprotService {
       }
       if (currentSegment !== r.segment) {
         totalRun = totalRun + Math.ceil(r.total/500)
-
         currentSegment = r.segment
       }
 
@@ -49,6 +45,7 @@ export class UniprotService {
       }
     }
   }
+
 
   async PrimeProcessReceivedData(data: string) {
     // @ts-ignore
@@ -76,7 +73,16 @@ export class UniprotService {
         }
         r["Subcellular location [CC]"] = subLoc
       }
-      /*if (r["Modified residue"]) {
+      const isoforms: string[] = []
+      if (r["Alternative products (isoforms)"]) {
+        for (const iso of r["Alternative products (isoforms)"].split(/[; ]/g)) {
+          if (iso.startsWith("IsoId=")) {
+            isoforms.push(iso.slice(6))
+          }
+        }
+        r["Alternative products (isoforms)"] = isoforms
+      }
+      if (r["Modified residue"]) {
         const mods = r["Modified residue"].split("; ")
         let modRes: any[] = []
         let modPosition = -1
@@ -95,7 +101,7 @@ export class UniprotService {
         }
 
         r["Modified residue"] = modRes
-      }*/
+      }
       if (r["Domain [FT]"]) {
         let domains: any[] = []
         let l: number = 0;
@@ -138,54 +144,80 @@ export class UniprotService {
         }
         r["Mutagenesis"] = mutagenesis
       }
+      this.db.set(r["Entry"], r)
 
-      r["_id"] = r["From"]
-      try {
-        this.db.set(r["Entry"], r)
-      } catch (e) {
-
-      }
-
-      this.dataMap.set(r["Entry"], r["Entry"])
       this.dataMap.set(r["From"], r["Entry"])
+      this.dataMap.set(r["Entry"], r["Entry"])
       if (this.accMap.has(r["Entry"])) {
-        const d = this.accMap.get(r["Entry"])
-        if (d) {
-          for (const a of d) {
-            const query = a.replace(",", ";")
-            for (const q of query.split(";")) {
-              this.dataMap.set(q, r["Entry"])
-              if (r["Gene Names"] !== "") {
-                if (!this.geneNameToAcc[r["Gene Names"]]) {
-                  this.geneNameToAcc[r["Gene Names"]] = {}
-                }
-                this.geneNameToAcc[r["Gene Names"]][q] = true
-              }
-            }
-          }
+        const a = this.accMap.get(r["Entry"])
+        // @ts-ignore
+        const query = a.replace(",", ";")
+        for (const q of query.split(";")) {
+          this.dataMap.set(q, r["Entry"])
         }
       }
     }
   }
 
 
-  getUniprotFromPrimary(accession_id: string) {
+  getUniprotFromAcc(accession_id: string) {
     if (this.db.has(accession_id)) {
       return this.db.get(accession_id)
     }
     if (this.accMap.has(accession_id)) {
-      const d = this.accMap.get(accession_id)
-      if (d) {
-        for (const a of d) {
-          if (this.dataMap.has(a)) {
-            const ac = this.dataMap.get(a)
-            if (ac) {
-              return this.db.get(ac)
-            }
+      const a = this.accMap.get(accession_id)
+      if (a) {
+        if (this.dataMap.has(a)) {
+          const ac = this.dataMap.get(a)
+          if (ac) {
+            return this.db.get(ac)
           }
         }
       }
     }
     return null
   }
+
+  getUniprotFasta(accession_id: string) {
+    return this.http.get("https://rest.uniprot.org/uniprotkb/"+accession_id+".fasta", {responseType: "text", observe: "body"})
+  }
+
+  parseFasta(data: string) {
+    const lines = data.split("\n")
+    let seq = ""
+    for (const line of lines) {
+      if (!line.startsWith(">")) {
+        seq = seq + line
+      }
+    }
+    return seq
+  }
+
+  *parseMultiFasta(data: string) {
+    const multiFastaMap = new Map<string, string>()
+    const lines = data.split("\n")
+    let seq: string = ""
+    let id: string = ""
+    for (const line of lines) {
+      if (!line.startsWith(">")) {
+        seq = seq + line
+      } else {
+        if (id !== "") {
+          yield {id: id.slice(), seq: seq.slice()}
+        }
+
+        id = line.slice(1)
+        const acc = new Accession(id, true)
+        if (acc.acc !== "" && acc.acc !== null && acc.acc !== undefined) {
+          id = acc.toString()
+        }
+        seq = ""
+
+      }
+    }
+    if (id !== "") {
+      yield {id: id.slice(), seq: seq.slice()}
+    }
+  }
 }
+

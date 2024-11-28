@@ -212,7 +212,6 @@ export class DataService {
   page: number = 1
   pageSize: number = 5
 
-
   clear() {
     this.selected = []
     this.selectedGenes = []
